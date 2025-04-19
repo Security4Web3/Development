@@ -1,7 +1,12 @@
+'use client';
+import WalletInfo from '../components/WalletInfo';
+
+
 export default function Home() {
-    return <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>🛡️ MaskedGuardian</h1>
-      <p>Welcome to your wallet security dashboard.</p>
-    </main>;
-  }
-  
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">🛡️ MaskedGuardian</h1>
+      <WalletInfo />
+    </main>
+  );
+}
