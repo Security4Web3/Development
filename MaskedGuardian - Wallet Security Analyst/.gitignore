@@ -1,0 +1,18 @@
+# Node modules
+node_modules/
+
+# Hardhat build artifacts
+artifacts/
+cache/
+typechain/
+coverage/
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings (optional)
+.vscode/
