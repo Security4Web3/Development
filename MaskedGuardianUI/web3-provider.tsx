@@ -10,8 +10,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const infuraId = process.env.NEXT_PUBLIC_INFURA_ID!;
 const sepoliaRpcUrl = `https://sepolia.infura.io/v3/${infuraId}`;
 
-// 2. Create wagmi config
-const config = createConfig({
+// 2. Create and export wagmi config
+export const config = createConfig({
   chains: [sepolia],
   connectors: [injected()],
   transports: {
