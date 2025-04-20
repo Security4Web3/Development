@@ -1,4 +1,5 @@
 'use client';
+import { config } from './web3-provider'; // Adjust the path if needed
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -6,14 +7,10 @@ import {
   useConnect,
   useDisconnect,
   useWalletClient,
-  usePublicClient,
 } from 'wagmi';
 import { readContract } from 'wagmi/actions';
-import { config } from './web3-provider'; // adjust path if needed
-
-
-import guardianAbi from '../MaskedGuardian - Wallet Security Analyst/contracts/MaskedGuardianABI.json';
 import { WriteGuardianContract } from '../MaskedGuardian - Wallet Security Analyst/library/WriteGuardianContract';
+import guardianAbi from '../MaskedGuardian - Wallet Security Analyst/contracts/MaskedGuardianABI.json';
 
 const guardianAddress = '0xce9B0A9615dc8C912f2ff0531D1cf166AeaB2838';
 
@@ -22,23 +19,25 @@ export default function ConnectWallet() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
-
   const [guardianStatus, setGuardianStatus] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false); // <-- NEW
+
+  useEffect(() => {
+    setMounted(true); // Mark component as mounted
+  }, []);
 
   useEffect(() => {
     const fetchGuardianStatus = async () => {
-      if (!address || !publicClient) return;
+      if (!address) return;
 
       try {
         const result = await readContract(config, {
           address: guardianAddress,
           abi: guardianAbi,
-          functionName: 'getGuardianStatus',
+          functionName: 'isBlockedRecipient',
+
           args: [address],
-          account: address,
         });
-        
 
         setGuardianStatus(result ? '🛡️ Protected' : '⚠️ Unprotected');
       } catch (err) {
@@ -48,7 +47,7 @@ export default function ConnectWallet() {
     };
 
     if (isConnected) fetchGuardianStatus();
-  }, [isConnected, publicClient, address]);
+  }, [isConnected, address]);
 
   const handleConnect = async () => {
     const connector = connectors.find((c) => c.id === 'injected') || connectors[0];
@@ -67,6 +66,8 @@ export default function ConnectWallet() {
       setGuardianStatus('❌ Write Error');
     }
   };
+
+  if (!mounted) return null; // <-- THIS PREVENTS SSR MISMATCH
 
   return (
     <div>
