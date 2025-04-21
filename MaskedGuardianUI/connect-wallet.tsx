@@ -1,5 +1,4 @@
 'use client';
-import { config } from './web3-provider'; // Adjust the path if needed
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -9,6 +8,7 @@ import {
   useWalletClient,
 } from 'wagmi';
 import { readContract } from 'wagmi/actions';
+import { config } from './web3-provider';
 import { WriteGuardianContract } from '../MaskedGuardian - Wallet Security Analyst/library/WriteGuardianContract';
 import guardianAbi from '../MaskedGuardian - Wallet Security Analyst/contracts/MaskedGuardianABI.json';
 
@@ -19,26 +19,25 @@ export default function ConnectWallet() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
+
   const [guardianStatus, setGuardianStatus] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false); // <-- NEW
+  const [mounted, setMounted] = useState(false);
+  const [streamId, setStreamId] = useState('');
 
   useEffect(() => {
-    setMounted(true); // Mark component as mounted
+    setMounted(true);
   }, []);
 
   useEffect(() => {
     const fetchGuardianStatus = async () => {
       if (!address) return;
-
       try {
         const result = await readContract(config, {
           address: guardianAddress,
           abi: guardianAbi,
           functionName: 'isBlockedRecipient',
-
           args: [address],
         });
-
         setGuardianStatus(result ? '🛡️ Protected' : '⚠️ Unprotected');
       } catch (err) {
         console.error('Error reading guardian status:', err);
@@ -54,10 +53,23 @@ export default function ConnectWallet() {
     connect({ connector });
   };
 
+  const handleAnalyzeStream = async (streamId: string) => {
+    if (!walletClient) return;
+    try {
+      const contract = WriteGuardianContract(walletClient);
+      await contract.write.analyzeAndPause(BigInt(streamId));
+      alert('✅ Stream analyzed successfully');
+    } catch (err) {
+      console.error('Guardian scan failed:', err);
+      alert('⚠️ Error analyzing stream — check console.');
+    }
+  };
+
   const handleSetGuardianStatus = async () => {
-    if (!walletClient || !address) return;
+    if (!walletClient || !address || !streamId) return;
 
     try {
+      await handleAnalyzeStream(streamId);
       const contract = WriteGuardianContract(walletClient);
       await contract.write.setGuardianStatus(address);
       setGuardianStatus('🛡️ Protected ✅');
@@ -67,20 +79,26 @@ export default function ConnectWallet() {
     }
   };
 
-  if (!mounted) return null; // <-- THIS PREVENTS SSR MISMATCH
+  if (!mounted) return null;
 
   return (
     <div>
       {isConnected ? (
         <>
-          <p>Connected as: {address}</p>
-          <p>Status: {guardianStatus}</p>
-          <button onClick={() => disconnect()}>Disconnect</button>
-          <br />
-          <button onClick={handleSetGuardianStatus}>Activate Guardian</button>
+          <p><strong>Connected:</strong> {address}</p>
+          <p className={guardianStatus?.includes('✅') ? 'status-success' :
+                        guardianStatus?.includes('⚠️') ? 'status-warning' :
+                        'status-error'}>
+            Status: {guardianStatus}
+          </p>
+         
+          <div className="flex space-x-2 mt-3">
+            <button onClick={() => disconnect()} className="button">Disconnect</button>
+            <button onClick={handleSetGuardianStatus} className="button">Activate Guardian</button>
+          </div>
         </>
       ) : (
-        <button onClick={handleConnect}>Connect Wallet</button>
+        <button onClick={handleConnect} className="button">Connect Wallet</button>
       )}
     </div>
   );
