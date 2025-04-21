@@ -5,15 +5,24 @@ import { useAccount } from 'wagmi';
 import { Watcher } from '../MaskedGuardian - Wallet Security Analyst/library/TransactionMonitor';
 import { ReadGuardianContract } from '../MaskedGuardian - Wallet Security Analyst/library/ReadGuardianContract';
 
-type Alert = {
+type RiskAlert = {
   address: string;
   timestamp: number;
-  type: 'risky' | 'safe';
+  hash: string;
 };
+
+function getRelativeTime(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+}
 
 export default function TransactionRiskScanner() {
   const { address } = useAccount();
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [threats, setThreats] = useState<RiskAlert[]>([]);
 
   useEffect(() => {
     if (!address) return;
@@ -33,16 +42,16 @@ export default function TransactionRiskScanner() {
 
         try {
           const isBlocked = await contract.read.isBlockedRecipient(counterpart);
-          const type = isBlocked ? 'risky' : 'safe';
-
-          setAlerts((prev) => [
-            {
-              address: counterpart,
-              timestamp: Date.now(),
-              type,
-            },
-            ...prev,
-          ]);
+          if (isBlocked) {
+            setThreats((prev) => [
+              {
+                address: counterpart,
+                timestamp: Date.now(),
+                hash: tx.hash,
+              },
+              ...prev,
+            ]);
+          }
         } catch (err) {
           console.error('Error checking scam list:', err);
         }
@@ -54,28 +63,36 @@ export default function TransactionRiskScanner() {
 
   return (
     <div className="alert-box">
-      <h3>Transaction Warnings</h3>
-      {alerts.length === 0 ? (
-        <p>✅ No risky activity detected.</p>
+      <h3>🧠 Live Threat Feed</h3>
+      {threats.length === 0 ? (
+        <p>✅ No threats detected yet.</p>
       ) : (
-        alerts.map((alert, idx) => (
+        threats.map((alert, idx) => (
           <div
             key={idx}
-            className={`alert-card ${alert.type}`}
+            className="threat-card"
             style={{
-              border: '1px solid',
-              borderColor: alert.type === 'risky' ? '#e53e3e' : '#38a169',
-              background: alert.type === 'risky' ? '#fff5f5' : '#f0fff4',
-              padding: '10px',
+              border: '1px solid #e53e3e',
+              background: '#fff5f5',
+              padding: '12px',
               borderRadius: '8px',
-              marginBottom: '10px',
+              marginBottom: '12px',
             }}
           >
-            <strong>{alert.type === 'risky' ? '🚨 RISKY TRANSACTION' : '✅ Verified Transaction'}</strong>
-            <p><strong>Address:</strong> {alert.address}</p>
+            <strong style={{ color: '#c53030' }}>🚨 RISKY TRANSACTION DETECTED</strong>
+            <p><strong>To:</strong> {alert.address}</p>
+            <p>
+              <strong>Tx Hash:</strong>{' '}
+              <a href={`https://sepolia.etherscan.io/tx/${alert.hash}`} target="_blank" rel="noreferrer">
+                {alert.hash}
+              </a>
+            </p>
+            <p><strong>Detected:</strong> {getRelativeTime(alert.timestamp)}</p>
+            <p style={{ fontWeight: 'bold', color: '#b83280' }}>⚠️ Threat Level: High Risk</p>
             <button
               onClick={() => navigator.clipboard.writeText(alert.address)}
               style={{
+                marginTop: '8px',
                 padding: '5px 10px',
                 fontSize: '0.8rem',
                 background: '#eee',
