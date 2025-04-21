@@ -17,5 +17,6 @@ Thumbs.db
 # VS Code settings (optional)
 .vscode/
 # .gitignore
+MaskedGuardianUI/node_modules
 node_modules
 .next
