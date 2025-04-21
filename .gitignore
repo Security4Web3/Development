@@ -1,22 +1,21 @@
-# Node modules
-node_modules/
+# Ignore all node_modules in any folder
+**/node_modules/
 
-# Hardhat build artifacts
-artifacts/
-cache/
-typechain/
+# Ignore Next.js build output
+**/.next/
+**/out/
+
+# Ignore environment files
+**/.env
+
+# Ignore test output
 coverage/
+*.log
 
-# Environment variables
-.env
-
-# OS files
+# Editor/project-specific junk
 .DS_Store
-Thumbs.db
-
-# VS Code settings (optional)
 .vscode/
-# .gitignore
-MaskedGuardianUI/node_modules
-node_modules
-.next
+.idea/
+
+# Vercel deployment folder (if using Vercel)
+.vercel/
