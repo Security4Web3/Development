@@ -18,4 +18,5 @@ Thumbs.db
 .vscode/
 # .gitignore
 node_modules
+MaskedGuardianUI/node_modules
 .next
