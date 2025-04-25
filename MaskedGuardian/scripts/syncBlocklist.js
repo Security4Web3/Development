@@ -1,6 +1,6 @@
 const axios = require("axios");
 const { ethers } = require("ethers");
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config({ path: '../MaskedGuardianUI/.env.local' });
 
 
 async function main() {
@@ -18,16 +18,26 @@ async function main() {
     wallet
   );
 
-  console.log("📡 Fetching scam address list from ScamSniffer...");
+  console.log("📡 Fetching scam address list from Chainabuse...");
 
-  const url = "https://raw.githubusercontent.com/scamsniffer/scam-database/main/blacklist/address.json";
-  const response = await axios.get(url);
-  const scamAddresses = response.data;
+  const response = await axios.get('https://api.chainabuse.com/api/v1/reports/search', {
+    headers: {
+      'Authorization': `Basic ${Buffer.from(`${process.env.CHAINABUSE_API_KEY}:${process.env.CHAINABUSE_API_KEY}`).toString('base64')}`
+    },
+    params: {
+      asset: 'ethereum',
+      type: 'scam',
+      limit: 100  // adjust if needed
+    }
+  });
 
-  console.log(`🔢 Total scam addresses fetched: ${scamAddresses.length}`);
+  const scamAddresses = response.data.data.map(report => report.address.toLowerCase());
+  const uniqueAddresses = [...new Set(scamAddresses)];
+
+  console.log(`🔢 Total scam addresses fetched: ${uniqueAddresses.length}`);
 
   let count = 0;
-  for (const address of scamAddresses) {
+  for (const address of uniqueAddresses) {
     if (!ethers.isAddress(address)) continue;
 
     try {

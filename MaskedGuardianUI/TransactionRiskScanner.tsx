@@ -1,110 +1,112 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { Watcher } from '../MaskedGuardian - Wallet Security Analyst/library/TransactionMonitor';
-import { ReadGuardianContract } from '../MaskedGuardian - Wallet Security Analyst/library/ReadGuardianContract';
-
-type RiskAlert = {
-  address: string;
-  timestamp: number;
-  hash: string;
-};
-
-function getRelativeTime(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-}
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import Watcher from "./components/watcher";
+import { ReadGuardianContract } from "./components/contracts";
+import { checkAddressWithChainabuse } from "./utils/checkAddressWithChainabuse";
 
 export default function TransactionRiskScanner() {
   const { address } = useAccount();
-  const [threats, setThreats] = useState<RiskAlert[]>([]);
+  const [threats, setThreats] = useState<
+    { address: string; timestamp: number; hash: string }[]
+  >([]);
 
   useEffect(() => {
     if (!address) return;
 
     const startWatching = async () => {
-      Watcher(address, async (tx) => {
-        const contract = ReadGuardianContract();
-        const from = tx.from?.toLowerCase?.();
-        const to = tx.to?.toLowerCase?.();
-        const me = address.toLowerCase();
-        const counterpart = to === me ? from : to;
+      const contract = ReadGuardianContract();
 
-        if (!counterpart || counterpart === '0x0000000000000000000000000000000000000000') {
-          console.warn('⚠️ Skipped tx: counterpart address invalid or missing.', tx);
-          return;
-        }
+      Watcher(
+        address,
+        async (tx) => {
+          // Outbound pending transaction
+          const to = tx.to?.toLowerCase?.();
+          const me = address.toLowerCase();
 
-        try {
-          const isBlocked = await contract.read.isBlockedRecipient(counterpart);
-          if (isBlocked) {
+          if (!to || to === "0x0000000000000000000000000000000000000000") {
+            console.warn("⚠️ Skipped tx: invalid recipient.");
+            return;
+          }
+
+          console.log("🚀 Outbound transaction detected:", to);
+
+          let isBlocked = false;
+          let isChainAbuse = false;
+
+          try {
+            isBlocked = await contract.read.isBlockedRecipient(to);
+          } catch (err) {
+            console.warn("🛑 Guardian contract read failed:", err);
+          }
+
+          try {
+            isChainAbuse = await checkAddressWithChainabuse(to);
+          } catch (err) {
+            console.warn("🛑 ChainAbuse API check failed:", err);
+          }
+
+          console.log("🔒 isBlocked?", isBlocked);
+          console.log("🧪 isChainAbuse?", isChainAbuse);
+
+          if (isBlocked || isChainAbuse) {
+            console.log("🚨 Threat detected on outbound tx, pushing to feed");
             setThreats((prev) => [
               {
-                address: counterpart,
+                address: to,
                 timestamp: Date.now(),
                 hash: tx.hash,
               },
               ...prev,
             ]);
+          } else {
+            console.log("✅ Outbound tx safe — no threat detected");
           }
-        } catch (err) {
-          console.error('Error checking scam list:', err);
+        },
+        (tx) => {
+          // Inbound confirmed transaction
+          console.log("📩 Inbound tx confirmed from:", tx.from);
+          // (Optional) you can display notifications here if you want
         }
-      });
+      );
     };
 
     startWatching();
   }, [address]);
 
   return (
-    <div className="alert-box">
-      <h3>🧠 Live Threat Feed</h3>
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">🚨 Live Threat Feed</h2>
       {threats.length === 0 ? (
-        <p>✅ No threats detected yet.</p>
+        <p className="text-gray-500">No threats detected yet.</p>
       ) : (
-        threats.map((alert, idx) => (
-          <div
-            key={idx}
-            className="threat-card"
-            style={{
-              border: '1px solid #e53e3e',
-              background: '#fff5f5',
-              padding: '12px',
-              borderRadius: '8px',
-              marginBottom: '12px',
-            }}
-          >
-            <strong style={{ color: '#c53030' }}>🚨 RISKY TRANSACTION DETECTED</strong>
-            <p><strong>To:</strong> {alert.address}</p>
-            <p>
-              <strong>Tx Hash:</strong>{' '}
-              <a href={`https://sepolia.etherscan.io/tx/${alert.hash}`} target="_blank" rel="noreferrer">
-                {alert.hash}
-              </a>
-            </p>
-            <p><strong>Detected:</strong> {getRelativeTime(alert.timestamp)}</p>
-            <p style={{ fontWeight: 'bold', color: '#b83280' }}>⚠️ Threat Level: High Risk</p>
-            <button
-              onClick={() => navigator.clipboard.writeText(alert.address)}
-              style={{
-                marginTop: '8px',
-                padding: '5px 10px',
-                fontSize: '0.8rem',
-                background: '#eee',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                cursor: 'pointer',
-              }}
+        <ul className="space-y-2">
+          {threats.map((threat, idx) => (
+            <li
+              key={`${threat.address}-${idx}`}
+              className="bg-red-100 p-3 rounded-lg shadow"
             >
-              Copy Address
-            </button>
-          </div>
-        ))
+              <p>
+                <strong>Scam Address:</strong> {threat.address}
+              </p>
+              <p>
+                <strong>Tx Hash:</strong>{" "}
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${threat.hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {threat.hash.slice(0, 10)}...
+                </a>
+              </p>
+              <p className="text-sm text-gray-500">
+                Detected: {new Date(threat.timestamp).toLocaleString()}
+              </p>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
